@@ -1,0 +1,10 @@
+
+.idea/
+
+words.txt
+
+iam_dataset.yaml
+
+ancie/__pycache__/
+
+*.pyc
