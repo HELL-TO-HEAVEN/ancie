@@ -12,22 +12,6 @@ def xywh_to_xyxy(box):
     y2 = box[1] + box[3]
     return np.array([box[0], box[1], x2, y2])
 
-def _point_in_box(point, box):
-    """
-    :param point: np.array([x,y])
-    :param box: np.array([x1,y1, x2, y2])
-    :return: Bool
-    """
-    truth_list = [(point[i] <= box[i::2][1]) & (point[i] >= box[i::2][0]) for i in range(2)]
-    return int(all(truth_list))
-
-# def _build_relative_center_points(fmap_w, fmap_h):
-#     sh_x, sh_y = np.meshgrid(np.arange(fmap_w), np.arange(fmap_h))
-#     pts = np.vstack((sh_x.ravel(), sh_y.ravel())).transpose()
-#     cntr_pts = pts + np.array([0.5] * 2, np.float32)[None, :]
-#     relative_pts = cntr_pts / np.array([fmap_w, fmap_h], np.float32)[None, :]
-#     return relative_pts
-
 def _build_relative_center_points(fmap_w, fmap_h):
     hs = np.tile((0.5 + np.arange(fmap_h)) / fmap_h, fmap_w)
     ws = np.repeat((0.5 + np.arange(fmap_w)) / fmap_w, fmap_h)

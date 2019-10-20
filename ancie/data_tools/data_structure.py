@@ -44,7 +44,7 @@ class Document:
     _FIELDS = tuple(('file_path'))
 
     file_path = attr.ib(type=str, repr=False)
-    words = attr.ib(default=None, type=List[dict], repr=False)
+    words = attr.ib(default=None, type=List[Word], repr=False)
     word_count = attr.ib(init=False, repr=True, type=int)
 
     def add_word(self, word: Word):
@@ -59,7 +59,7 @@ class Document:
     def to_dict(self):
         return {
             'file_path': self.file_path,
-            'words': [doc.to_dict() for doc in self.words]
+            'words': [word.to_dict() for word in self.words]
         }
 
 @attr.s

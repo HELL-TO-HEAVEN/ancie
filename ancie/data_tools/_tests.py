@@ -2,13 +2,22 @@ from pathlib import Path
 
 from torch.utils.data import DataLoader, RandomSampler
 
-from ancie.data_tools import crop_to_boxes, to_pytorch_tensors, get_resize_transform, get_heatmap_maker
 from ancie.data_tools.bboxes import extract_boxes_from_heatmap_slots
-from ancie.data_tools.document_handlers import DocHandler
 from ancie.data_tools.iamdb_converter import build_dataset
-from ancie.data_tools.pytorch_datasets import DocumentCollectionDataset
-from ancie.data_tools.transformations import get_box_assigner
-from ancie.data_tools.visualization import show_img_boxes
+
+from ancie.data_tools.transformations import (
+    get_box_assigner,
+    crop_to_boxes,
+    to_pytorch_tensors,
+    get_resize_transform,
+    get_heatmap_maker
+)
+
+from ancie.data_tools import (
+    show_img_boxes,
+    DocumentCollectionDataset,
+    DocHandler
+)
 
 if __name__ == '__main__':
     import numpy as np
@@ -18,6 +27,21 @@ if __name__ == '__main__':
     image_path = Path('D:\\research\\www.fki.inf.unibe.ch\\DBs\\iamDB\\data\\forms')
     model_shrinkae_facotr = 32
 
+    doc_handler = DocHandler.tensor_handler(
+        transforms=[
+            crop_to_boxes,
+            get_resize_transform(
+                target_hw=(1118, 1024),
+                model_shrinkage_factor=model_shrinkae_facotr
+            ),
+            get_heatmap_maker(),
+            get_box_assigner(
+                model_shrinkae_facotr=model_shrinkae_facotr
+            ),
+            to_pytorch_tensors
+        ]
+    )
+
     iam_dataset = build_dataset(
         image_folder=image_path,
         word_file=word_file
@@ -25,20 +49,7 @@ if __name__ == '__main__':
 
     dataset = DocumentCollectionDataset(
         doc_collection=iam_dataset,
-        doc_handler=DocHandler.tensor_handler(
-            transforms=[
-                crop_to_boxes,
-                get_resize_transform(
-                    target_hw=(1118, 1024),
-                    model_shrinkage_factor=model_shrinkae_facotr
-                ),
-                get_heatmap_maker(),
-                get_box_assigner(
-                    model_shrinkae_facotr=model_shrinkae_facotr
-                ),
-                to_pytorch_tensors
-            ]
-        )
+        doc_handler=doc_handler
     )
 
     loader = DataLoader(
@@ -60,13 +71,11 @@ if __name__ == '__main__':
                 fmap_wh=(fmap_w, fmap_h),
                 status=batch.labels.numpy()[idx, :, -1],
                 cords=batch.labels.numpy()[idx, :, :-1],
-            )*np.array([batch.image.shape[3], batch.image.shape[2]]*2)
+            ) * np.array([batch.image.shape[3], batch.image.shape[2]] * 2)
 
             show_img_boxes(
-                debugimg=batch.image[idx].numpy().transpose(1,2,0),
+                debugimg=batch.image[idx].numpy().transpose(1, 2, 0),
                 boxes=boxes,
                 wait=900
             )
         pass
-
-
