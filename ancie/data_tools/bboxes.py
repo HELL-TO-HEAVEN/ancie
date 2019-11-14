@@ -29,12 +29,21 @@ def assign_boxes_to_heatmap_slots(
     t_w = round(fmap_w*ppf_w)
     t_h = round(fmap_h*ppf_h)
 
+    # Feature map features enumerated in [0,1] range
     relative_pts = _build_relative_center_points(fmap_h=fmap_h, fmap_w=fmap_w)
+    # gt boxes in [0, 1] range
     relative_boxes = bboxes / np.array([t_w, t_h, t_w, t_h])
+    # center points of gt_boxes in [0,1] range
     box_centers = (relative_boxes[:, :2] + relative_boxes[:, 2:]) / 2
+    # box width height dim. in [0,1] range
     box_wh = relative_boxes[:, 2:] - relative_boxes[:, :2]
+    # shift vectors of box center from feature centers
+    # (num_features, num_boxes, 2)
     cntr_shift_vec = (box_centers[None, :, :] - relative_pts[:, None, :])
+    # sorted distance - flat (num_features*num_boxes)
     dists = np.argsort(np.sum(cntr_shift_vec**2, axis=2).flatten())
+
+    # Assign gt_boxes to features according to distance (go from min to max distance)
     gt_map = np.repeat(-1, box_centers.shape[0])
     slot_map = np.repeat(-1, relative_pts.shape[0])
     for idx in dists:
@@ -46,6 +55,8 @@ def assign_boxes_to_heatmap_slots(
             continue
         if np.all(gt_map >= 0):
             break
+
+    # cords are shift vector from feature center & box_wh (all im [0,1] range)
     target_cords = np.zeros((relative_pts.shape[0], 4), np.float32)
     target_cords[gt_map, :2] = cntr_shift_vec[gt_map, np.arange(gt_map.shape[0]), :]
     target_cords[gt_map, 2:] = box_wh

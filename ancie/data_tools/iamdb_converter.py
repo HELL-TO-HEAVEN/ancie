@@ -1,11 +1,11 @@
+from pathlib import Path
 from typing import Union
 
-import attr
 import numpy as np
-import yaml
-from pathlib import Path
+
 from ancie.data_tools import Word, Document, DocumentCollection, CollectionStatistics
 from ancie.data_tools.bboxes import BOX_DTYPE, get_empty_bbox, xywh_to_xyxy
+
 
 def _proc_word_id_to_form_id(word_id: str) -> str:
     tmp = word_id.split('-')[:2]

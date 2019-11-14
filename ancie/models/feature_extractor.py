@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import torch
 from torch import nn
 from torchvision.models import resnet18, ResNet
@@ -120,12 +122,19 @@ class HeatMapGenerator(nn.Module):
         x = self.out_conv(x)
         return x
 
-def bottleneck_resnet(block_sizes=(2, 2, 2, 2), base_channels=32):
-    return ResNetFeatures(
+def bottleneck_resnet(block_sizes=(2, 2, 2, 2), base_channels=32) -> (nn.Module, Tuple, int):
+    _resnet = ResNetFeatures(
         block=Bottleneck,
         layers=block_sizes,
         width_per_group=base_channels
     )
+
+    fmap = _resnet(torch.ones(size=(2,3, 640,928), dtype=torch.float32))
+
+    shrink_hw = (640 / fmap.shape[2], 928 / fmap.shape[3])
+
+    return _resnet, shrink_hw, fmap.shape[1]
+
 
 
 if __name__ == '__main__':
