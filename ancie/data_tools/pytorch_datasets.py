@@ -26,7 +26,7 @@ class DocumentCollectionDataset(Dataset):
 
         return handler_out
 
-    def get_collate_fn(self):
+    def get_collate_fn(self, **kwargs):
         return self.doc_handler.collate_func
 
 
