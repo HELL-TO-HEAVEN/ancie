@@ -1,5 +1,7 @@
 from typing import Tuple
 
+import numpy as np
+
 import torch
 from torch import nn
 from torchvision.models import resnet18, ResNet
@@ -72,29 +74,31 @@ class ResNetFeatures(ResNet):
         return x
 
 
-
 class HeatMapGenerator(nn.Module):
 
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, upscale_rate, scale_factor=2, kernel_size=3):
         super(HeatMapGenerator, self).__init__()
 
 
         ch_size = in_channels
         self.layers = []
 
-        ksize = 3
-        pad = int((ksize-1) / 2)
+        pad = int((kernel_size-1) / 2)
 
-        for i in range(5):
+        number_of_upsacles = np.log(upscale_rate) / np.log(scale_factor)
+        assert number_of_upsacles.is_integer(), f'number of upsalce is not integer ({number_of_upsacles})' \
+                                                f'\n trying to upscale by {upscale_rate} with factor {scale_factor}'
+
+        for i in range(int(number_of_upsacles)):
             ch_next = ch_size // 2
             l = nn.Sequential(
                 nn.Conv2d(
                     in_channels=ch_size,
                     out_channels=ch_next,
-                    kernel_size=ksize,
+                    kernel_size=kernel_size,
                     padding=pad
                 ),
-                nn.Upsample(scale_factor=2),
+                nn.Upsample(scale_factor=scale_factor),
                 # nn.ConvTranspose2d(
                 #     in_channels=ch_size,
                 #     out_channels=ch_next,

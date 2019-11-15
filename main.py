@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import  attr
 import torch
 from torch.utils.data import DataLoader, RandomSampler
 
@@ -19,20 +20,49 @@ from ancie.data_tools import (
     DocumentCollectionDataset,
     DocHandler
 )
+from ancie.models.box_regression import BoxRegressor
 
-from ancie.models.feature_extractor import (
+from ancie.models.heatmap import (
     bottleneck_resnet,
     HeatMapGenerator
 )
 
-def build_networks(hmap_channels):
+
+def _torch_net_attrib():
+    return attr.ib(repr=False, type=torch.nn.Module)
+
+@attr.s
+class Networks:
+    fmap_encoder = attr.ib(repr=False, type=torch.nn.Module)
+    hmap_generator = attr.ib(repr=False, type=torch.nn.Module)
+    box_regression = attr.ib(repr=False, type=torch.nn.Module)
+
+    shrinkage_factor = attr.ib(type=int)
+
+
+
+def build_networks(hmap_channels) -> Networks:
     fmap_encoder, model_shrinkage_facotr_hw, fmap_channels = bottleneck_resnet()
     assert model_shrinkage_facotr_hw[0] == model_shrinkage_facotr_hw[1], "Feature Map shrinkage not same for H and W"
     model_shrinkage_facotr = int(model_shrinkage_facotr_hw[0])
 
-    heatmap_generator = HeatMapGenerator(in_channels=fmap_channels, out_channels=hmap_channels)
+    heatmap_generator = HeatMapGenerator(
+        in_channels=fmap_channels,
+        out_channels=hmap_channels,
+        upscale_rate=model_shrinkage_facotr
+    )
 
-    return fmap_encoder, heatmap_generator, model_shrinkage_facotr
+    box_reg = BoxRegressor(
+        in_channels=hmap_channels,
+        downscale_ratio=model_shrinkage_facotr,
+
+    )
+    return Networks(
+        fmap_encoder=fmap_encoder,
+        hmap_generator=heatmap_generator,
+        box_regression=box_reg,
+        shrinkage_factor=model_shrinkage_facotr
+    )
 
 
 if __name__ == '__main__':
@@ -47,20 +77,24 @@ if __name__ == '__main__':
         word_file=word_file
     )
 
-    fmap_encoder, heatmap_generator, model_shrinkage_facotr = build_networks(
+    networks = build_networks(
         hmap_channels=3
     )
+
+    # fmap_encoder, heatmap_generator, model_shrinkage_facotr = build_networks(
+    #     hmap_channels=3
+    # )
 
     doc_handler = DocHandler.tensor_handler(
         transforms=[
             crop_to_boxes,
             get_resize_transform(
                 target_hw=(1118, 1024),
-                model_shrinkage_factor=model_shrinkage_facotr
+                model_shrinkage_factor=networks.shrinkage_factor
             ),
             get_heatmap_maker(),
             get_box_assigner(
-                model_shrinkae_facotr=model_shrinkage_facotr
+                model_shrinkae_facotr=networks.shrinkage_factor
             ),
             to_pytorch_tensors
         ]
@@ -87,11 +121,11 @@ if __name__ == '__main__':
 
         # (1) Features
         # in (bsize, 3, h, w) out (bsize, ch, h // 32, w // 32)
-        feature_map = fmap_encoder(batch.image.float())
+        feature_map = networks.fmap_encoder(batch.image.float())
 
         # (2) Heatmap
         # in (bsize, ch, h // 32, w // 32) out (bsize, num_hmap_cls, h, w)
-        hmap_logits = heatmap_generator(feature_map)
+        hmap_logits = networks.hmap_generator(feature_map)
         # outs a scalar
         hmap_loss = hmap_xent_loss(hmap_logits, batch.heatmap.long())
 
@@ -100,9 +134,7 @@ if __name__ == '__main__':
         # A net that takes hmap as input and predicts labels
         # (bsize, fmap_h*fmap_w, 5) - dist from feature center & width, height of box. last cord flag if feature
         # assigned to box
-        batch.labels
-
-
+        box_encode_targets = networks.box_regression(hmap_logits)
 
 
         for idx in range(batch.image.shape[0]):
